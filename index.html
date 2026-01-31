@@ -29,6 +29,41 @@
     <section class="board-wrapper">
       <canvas id="board" width="600" height="600" aria-label="技能五子棋棋盘"></canvas>
     </section>
+    <section class="skills" aria-label="技能面板">
+      <h2>玩家技能</h2>
+      <div class="skill-grid">
+        <button class="skill-card" data-skill="timeRewind" type="button">
+          <span class="skill-icon" aria-hidden="true">
+            <img src="icon/skill1.jpg" alt="" />
+          </span>
+          <span class="skill-info">
+            <span class="skill-name">时光倒流</span>
+            <span class="skill-desc">悔棋，撤回双方最新一手。</span>
+            <span class="skill-meta">剩余：<span data-skill-uses>3</span> 次</span>
+          </span>
+        </button>
+        <button class="skill-card" data-skill="sandShift" type="button">
+          <span class="skill-icon" aria-hidden="true">
+            <img src="icon/skill2.jpg" alt="" />
+          </span>
+          <span class="skill-info">
+            <span class="skill-name">飞沙走石</span>
+            <span class="skill-desc">向四周移动己方棋子一格。</span>
+            <span class="skill-meta">冷却：<span data-skill-cd>0</span>/10 手 · 剩余：<span data-skill-uses>5</span> 次</span>
+          </span>
+        </button>
+        <button class="skill-card" data-skill="mountainLift" type="button">
+          <span class="skill-icon" aria-hidden="true">
+            <img src="icon/skill3.jpg" alt="" />
+          </span>
+          <span class="skill-info">
+            <span class="skill-name">力拔山兮</span>
+            <span class="skill-desc">直接提走一个 AI 棋子。</span>
+            <span class="skill-meta">冷却：<span data-skill-cd>0</span>/25 手 · 剩余：<span data-skill-uses>2</span> 次</span>
+          </span>
+        </button>
+      </div>
+    </section>
     <section class="legend">
       <div><span class="stone player"></span> 玩家</div>
       <div><span class="stone ai"></span> AI</div>
