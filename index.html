@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>五子棋 - 人机对战</title>
+  <title>技能五子棋 - 人机对战</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main class="app">
     <header>
-      <h1>五子棋</h1>
-      <p>点击棋盘落子，与 AI 对战。</p>
+      <h1>技能五子棋</h1>
+      <p>连成五子可对对手造成 1 点伤害，并移除这条线上的棋子；双方各有 3 点血量。</p>
     </header>
     <section class="controls">
       <label for="difficulty">AI 难度</label>
@@ -21,9 +21,13 @@
       </select>
       <button id="restart">重新开始</button>
       <div id="status" class="status">玩家先手</div>
+      <div class="hp">
+        <div>玩家 HP：<span id="player-hp"></span></div>
+        <div>AI HP：<span id="ai-hp"></span></div>
+      </div>
     </section>
     <section class="board-wrapper">
-      <canvas id="board" width="600" height="600" aria-label="五子棋棋盘"></canvas>
+      <canvas id="board" width="600" height="600" aria-label="技能五子棋棋盘"></canvas>
     </section>
     <section class="legend">
       <div><span class="stone player"></span> 玩家</div>

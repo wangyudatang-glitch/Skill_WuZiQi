@@ -2,6 +2,8 @@ const canvas = document.getElementById("board");
 const statusEl = document.getElementById("status");
 const restartBtn = document.getElementById("restart");
 const difficultySelect = document.getElementById("difficulty");
+const playerHpEl = document.getElementById("player-hp");
+const aiHpEl = document.getElementById("ai-hp");
 
 const ctx = canvas.getContext("2d");
 const boardSize = 15;
@@ -11,6 +13,9 @@ const cellSize = (canvas.width - padding * 2) / (boardSize - 1);
 let board = [];
 let isPlayerTurn = true;
 let gameOver = false;
+const maxHp = 3;
+let playerHp = maxHp;
+let aiHp = maxHp;
 
 const directions = [
   [1, 0],
@@ -23,12 +28,20 @@ function initBoard() {
   board = Array.from({ length: boardSize }, () => Array(boardSize).fill(0));
   isPlayerTurn = true;
   gameOver = false;
+  playerHp = maxHp;
+  aiHp = maxHp;
   updateStatus("玩家先手");
+  updateHpDisplay();
   drawBoard();
 }
 
 function updateStatus(text) {
   statusEl.textContent = text;
+}
+
+function updateHpDisplay() {
+  playerHpEl.textContent = `${playerHp}/${maxHp}`;
+  aiHpEl.textContent = `${aiHp}/${maxHp}`;
 }
 
 function drawBoard() {
@@ -86,28 +99,54 @@ function getCellFromEvent(event) {
   return { row, col };
 }
 
-function isWinningMove(row, col, player) {
-  for (const [dx, dy] of directions) {
-    let count = 1;
-    count += countDirection(row, col, player, dx, dy);
-    count += countDirection(row, col, player, -dx, -dy);
-    if (count >= 5) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function countDirection(row, col, player, dx, dy) {
-  let count = 0;
-  let r = row + dy;
-  let c = col + dx;
+function getLineThroughMove(row, col, player, dx, dy) {
+  const cells = [{ r: row, c: col }];
+  let r = row - dy;
+  let c = col - dx;
   while (r >= 0 && c >= 0 && r < boardSize && c < boardSize && board[r][c] === player) {
-    count += 1;
+    cells.unshift({ r, c });
+    r -= dy;
+    c -= dx;
+  }
+  r = row + dy;
+  c = col + dx;
+  while (r >= 0 && c >= 0 && r < boardSize && c < boardSize && board[r][c] === player) {
+    cells.push({ r, c });
     r += dy;
     c += dx;
   }
-  return count;
+  return cells;
+}
+
+function getFiveSegmentThroughMove(cells, row, col) {
+  const moveIndex = cells.findIndex((cell) => cell.r === row && cell.c === col);
+  if (moveIndex === -1 || cells.length < 5) {
+    return [];
+  }
+  const start = Math.min(Math.max(moveIndex - 2, 0), cells.length - 5);
+  return cells.slice(start, start + 5);
+}
+
+function applyLineDamageFromMove(row, col, player) {
+  const removeSet = new Set();
+  let damage = 0;
+  for (const [dx, dy] of directions) {
+    const lineCells = getLineThroughMove(row, col, player, dx, dy);
+    if (lineCells.length >= 5) {
+      const segment = getFiveSegmentThroughMove(lineCells, row, col);
+      if (segment.length === 5) {
+        damage += 1;
+        for (const cell of segment) {
+          removeSet.add(`${cell.r},${cell.c}`);
+        }
+      }
+    }
+  }
+  for (const key of removeSet) {
+    const [r, c] = key.split(",").map(Number);
+    board[r][c] = 0;
+  }
+  return damage;
 }
 
 function handlePlayerMove(event) {
@@ -123,8 +162,13 @@ function handlePlayerMove(event) {
     return;
   }
   board[row][col] = 1;
+  const damage = applyLineDamageFromMove(row, col, 1);
+  if (damage > 0) {
+    aiHp = Math.max(0, aiHp - damage);
+    updateHpDisplay();
+  }
   drawBoard();
-  if (isWinningMove(row, col, 1)) {
+  if (aiHp <= 0) {
     gameOver = true;
     updateStatus("玩家获胜！");
     return;
@@ -146,8 +190,13 @@ function aiMove() {
     return;
   }
   board[move.row][move.col] = 2;
+  const damage = applyLineDamageFromMove(move.row, move.col, 2);
+  if (damage > 0) {
+    playerHp = Math.max(0, playerHp - damage);
+    updateHpDisplay();
+  }
   drawBoard();
-  if (isWinningMove(move.row, move.col, 2)) {
+  if (playerHp <= 0) {
     gameOver = true;
     updateStatus("AI 获胜！");
     return;
@@ -206,10 +255,6 @@ function minimax(depth, isMaximizing, alpha, beta) {
     let bestScore = -Infinity;
     for (const move of candidates) {
       board[move.row][move.col] = 2;
-      if (isWinningMove(move.row, move.col, 2)) {
-        board[move.row][move.col] = 0;
-        return 100000;
-      }
       const score = minimax(depth - 1, false, alpha, beta);
       board[move.row][move.col] = 0;
       bestScore = Math.max(bestScore, score);
@@ -223,10 +268,6 @@ function minimax(depth, isMaximizing, alpha, beta) {
   let bestScore = Infinity;
   for (const move of candidates) {
     board[move.row][move.col] = 1;
-    if (isWinningMove(move.row, move.col, 1)) {
-      board[move.row][move.col] = 0;
-      return -100000;
-    }
     const score = minimax(depth - 1, true, alpha, beta);
     board[move.row][move.col] = 0;
     bestScore = Math.min(bestScore, score);

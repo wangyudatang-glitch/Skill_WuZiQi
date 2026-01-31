@@ -53,6 +53,14 @@ header h1 {
   background: #ede6d9;
 }
 
+.hp {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-weight: 600;
+  color: #4b3f2f;
+}
+
 .board-wrapper {
   display: flex;
   justify-content: center;
