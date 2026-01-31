@@ -10,6 +10,12 @@ const ctx = canvas.getContext("2d");
 const boardSize = 15;
 const padding = 30;
 const cellSize = (canvas.width - padding * 2) / (boardSize - 1);
+const queenValue = 3;
+const queenImage = new Image();
+queenImage.src = "icon/queen.jpg";
+queenImage.onload = () => {
+  drawBoard();
+};
 
 let board = [];
 let isPlayerTurn = true;
@@ -22,11 +28,17 @@ let turnCount = 0;
 let currentSkill = null;
 let selectedSkillStone = null;
 let aiTimeoutId = null;
+let queenReady = false;
+let selectedQueen = null;
 
 const skills = {
   timeRewind: { maxUses: 3, usesLeft: 3, cooldown: 0, lastUsedTurn: null },
   sandShift: { maxUses: 5, usesLeft: 5, cooldown: 10, lastUsedTurn: null },
   mountainLift: { maxUses: 2, usesLeft: 2, cooldown: 25, lastUsedTurn: null },
+  boardBlast: { maxUses: 2, usesLeft: 2, cooldown: 50, lastUsedTurn: null },
+  starDevour: { maxUses: Infinity, usesLeft: Infinity, cooldown: 500, lastUsedTurn: null },
+  colorFlip: { maxUses: 1, usesLeft: 1, cooldown: 0, lastUsedTurn: null },
+  summonQueen: { maxUses: 1, usesLeft: 1, cooldown: 0, lastUsedTurn: null },
 };
 
 const directions = [
@@ -46,6 +58,8 @@ function initBoard() {
   turnCount = 0;
   currentSkill = null;
   selectedSkillStone = null;
+  queenReady = false;
+  selectedQueen = null;
   if (aiTimeoutId) {
     window.clearTimeout(aiTimeoutId);
     aiTimeoutId = null;
@@ -94,6 +108,9 @@ function isSkillAvailable(skillId) {
   if (skillId === "timeRewind" && moveHistory.length < 2) {
     return false;
   }
+  if (skillId === "summonQueen" && queenReady) {
+    return false;
+  }
   return skill.usesLeft > 0 && getCooldownRemaining(skill) === 0;
 }
 
@@ -107,7 +124,7 @@ function updateSkillUI() {
     const usesEl = button.querySelector("[data-skill-uses]");
     const cdEl = button.querySelector("[data-skill-cd]");
     if (usesEl) {
-      usesEl.textContent = skill.usesLeft;
+      usesEl.textContent = Number.isFinite(skill.usesLeft) ? skill.usesLeft : "∞";
     }
     if (cdEl) {
       cdEl.textContent = getCooldownRemaining(skill);
@@ -146,6 +163,20 @@ function drawStone(row, col, player) {
   const x = padding + col * cellSize;
   const y = padding + row * cellSize;
   const radius = cellSize * 0.45;
+  if (player === queenValue) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.clip();
+    if (queenImage.complete && queenImage.naturalWidth > 0) {
+      ctx.drawImage(queenImage, x - radius, y - radius, radius * 2, radius * 2);
+    } else {
+      ctx.fillStyle = "#f0d8a3";
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
   const gradient = ctx.createRadialGradient(x - radius / 3, y - radius / 3, radius / 5, x, y, radius);
   if (player === 1) {
     gradient.addColorStop(0, "#555");
@@ -172,18 +203,25 @@ function getCellFromEvent(event) {
   return { row, col };
 }
 
+function matchesPlayer(value, player) {
+  if (player === 1) {
+    return value === 1 || value === queenValue;
+  }
+  return value === 2;
+}
+
 function getLineThroughMove(row, col, player, dx, dy) {
   const cells = [{ r: row, c: col }];
   let r = row - dy;
   let c = col - dx;
-  while (r >= 0 && c >= 0 && r < boardSize && c < boardSize && board[r][c] === player) {
+  while (r >= 0 && c >= 0 && r < boardSize && c < boardSize && matchesPlayer(board[r][c], player)) {
     cells.unshift({ r, c });
     r -= dy;
     c -= dx;
   }
   r = row + dy;
   c = col + dx;
-  while (r >= 0 && c >= 0 && r < boardSize && c < boardSize && board[r][c] === player) {
+  while (r >= 0 && c >= 0 && r < boardSize && c < boardSize && matchesPlayer(board[r][c], player)) {
     cells.push({ r, c });
     r += dy;
     c += dx;
@@ -218,8 +256,12 @@ function applyLineDamageFromMove(row, col, player) {
   const removedCells = [];
   for (const key of removeSet) {
     const [r, c] = key.split(",").map(Number);
+    if (player === 1 && board[r][c] === queenValue) {
+      continue;
+    }
+    const removedValue = board[r][c];
     board[r][c] = 0;
-    removedCells.push({ row: r, col: c, player });
+    removedCells.push({ row: r, col: c, value: removedValue });
   }
   return { damage, removedCells };
 }
@@ -229,7 +271,11 @@ function handlePlayerMove(cell) {
   if (board[row][col] !== 0) {
     return;
   }
-  board[row][col] = 1;
+  const placedValue = queenReady ? queenValue : 1;
+  board[row][col] = placedValue;
+  if (queenReady) {
+    queenReady = false;
+  }
   const { damage, removedCells } = applyLineDamageFromMove(row, col, 1);
   applyDamageToOpponent(1, damage);
   finishPlayerAction({
@@ -406,7 +452,7 @@ function evaluateBoardFor(player) {
   const visited = new Set();
   for (let row = 0; row < boardSize; row++) {
     for (let col = 0; col < boardSize; col++) {
-      if (board[row][col] !== player) {
+      if (!matchesPlayer(board[row][col], player)) {
         continue;
       }
       for (const [dx, dy] of directions) {
@@ -428,7 +474,7 @@ function getChain(row, col, player, dx, dy) {
   const cells = [];
   let r = row;
   let c = col;
-  while (r >= 0 && c >= 0 && r < boardSize && c < boardSize && board[r][c] === player) {
+  while (r >= 0 && c >= 0 && r < boardSize && c < boardSize && matchesPlayer(board[r][c], player)) {
     cells.push({ r, c });
     length += 1;
     r += dy;
@@ -497,7 +543,9 @@ function finishPlayerAction(entry, { endTurn = true } = {}) {
   }
   if (entry.skillId) {
     const skill = skills[entry.skillId];
-    skill.usesLeft = Math.max(0, skill.usesLeft - 1);
+    if (Number.isFinite(skill.usesLeft)) {
+      skill.usesLeft = Math.max(0, skill.usesLeft - 1);
+    }
     skill.lastUsedTurn = actionTurnIndex;
   }
   updateSkillUI();
@@ -511,6 +559,7 @@ function finishPlayerAction(entry, { endTurn = true } = {}) {
   if (!endTurn) {
     currentSkill = null;
     selectedSkillStone = null;
+    selectedQueen = null;
     updateStatus("技能已使用，请落子。");
     updateSkillUI();
     return;
@@ -518,6 +567,7 @@ function finishPlayerAction(entry, { endTurn = true } = {}) {
   isPlayerTurn = false;
   currentSkill = null;
   selectedSkillStone = null;
+  selectedQueen = null;
   updateStatus("AI 思考中...");
   updateSkillUI();
   if (aiTimeoutId) {
@@ -536,7 +586,9 @@ function rebuildSkillState() {
   });
   moveHistory.forEach((entry) => {
     if (entry.skillId && skills[entry.skillId]) {
-      skills[entry.skillId].usesLeft = Math.max(0, skills[entry.skillId].usesLeft - 1);
+      if (Number.isFinite(skills[entry.skillId].usesLeft)) {
+        skills[entry.skillId].usesLeft = Math.max(0, skills[entry.skillId].usesLeft - 1);
+      }
       skills[entry.skillId].lastUsedTurn = entry.turnIndex;
     }
   });
@@ -546,22 +598,38 @@ function undoMove(entry) {
   if (entry.type === "place") {
     board[entry.row][entry.col] = 0;
     entry.removedCells.forEach((cell) => {
-      board[cell.row][cell.col] = entry.player;
+      board[cell.row][cell.col] = cell.value;
     });
     restoreDamageToOpponent(entry.player, entry.damage);
     return;
   }
   if (entry.type === "move") {
-    board[entry.toRow][entry.toCol] = 0;
-    board[entry.fromRow][entry.fromCol] = entry.player;
+    board[entry.toRow][entry.toCol] = entry.capturedValue;
+    board[entry.fromRow][entry.fromCol] = entry.movedValue;
     entry.removedCells.forEach((cell) => {
-      board[cell.row][cell.col] = entry.player;
+      board[cell.row][cell.col] = cell.value;
     });
     restoreDamageToOpponent(entry.player, entry.damage);
     return;
   }
   if (entry.type === "remove") {
     board[entry.targetRow][entry.targetCol] = 2;
+    return;
+  }
+  if (entry.type === "area" || entry.type === "clear") {
+    entry.removedCells.forEach((cell) => {
+      board[cell.row][cell.col] = cell.value;
+    });
+    return;
+  }
+  if (entry.type === "flip") {
+    entry.changedCells.forEach((cell) => {
+      board[cell.row][cell.col] = cell.value;
+    });
+    return;
+  }
+  if (entry.type === "summon") {
+    queenReady = false;
   }
 }
 
@@ -582,6 +650,7 @@ function useTimeRewind() {
   isPlayerTurn = true;
   currentSkill = null;
   selectedSkillStone = null;
+  selectedQueen = null;
   if (aiTimeoutId) {
     window.clearTimeout(aiTimeoutId);
     aiTimeoutId = null;
@@ -624,6 +693,8 @@ function handleSandShift(cell) {
     fromCol: selectedSkillStone.col,
     toRow: row,
     toCol: col,
+    movedValue: 1,
+    capturedValue: 0,
     damage,
     removedCells,
     skillId: "sandShift",
@@ -648,10 +719,168 @@ function handleMountainLift(cell) {
   }, { endTurn: false });
 }
 
+function handleBoardBlast(cell) {
+  const removedCells = [];
+  for (let r = cell.row - 1; r <= cell.row + 1; r++) {
+    for (let c = cell.col - 1; c <= cell.col + 1; c++) {
+      if (r < 0 || c < 0 || r >= boardSize || c >= boardSize) {
+        continue;
+      }
+      if (board[r][c] === 0) {
+        continue;
+      }
+      removedCells.push({ row: r, col: c, value: board[r][c] });
+      board[r][c] = 0;
+    }
+  }
+  finishPlayerAction({
+    type: "area",
+    player: 1,
+    removedCells,
+    damage: 0,
+    skillId: "boardBlast",
+  }, { endTurn: false });
+}
+
+function handleStarDevour() {
+  if (!isSkillAvailable("starDevour")) {
+    return;
+  }
+  const removedCells = [];
+  for (let row = 0; row < boardSize; row++) {
+    for (let col = 0; col < boardSize; col++) {
+      if (board[row][col] !== 0) {
+        removedCells.push({ row, col, value: board[row][col] });
+        board[row][col] = 0;
+      }
+    }
+  }
+  finishPlayerAction({
+    type: "clear",
+    player: 1,
+    removedCells,
+    damage: 0,
+    skillId: "starDevour",
+  }, { endTurn: false });
+}
+
+function handleColorFlip() {
+  if (!isSkillAvailable("colorFlip")) {
+    return;
+  }
+  const changedCells = [];
+  for (let row = 0; row < boardSize; row++) {
+    for (let col = 0; col < boardSize; col++) {
+      const value = board[row][col];
+      if (value === 0) {
+        continue;
+      }
+      changedCells.push({ row, col, value });
+      if (value === queenValue) {
+        board[row][col] = 2;
+      } else if (value === 1) {
+        board[row][col] = 2;
+      } else if (value === 2) {
+        board[row][col] = 1;
+      }
+    }
+  }
+  finishPlayerAction({
+    type: "flip",
+    player: 1,
+    changedCells,
+    damage: 0,
+    skillId: "colorFlip",
+  }, { endTurn: false });
+}
+
+function handleSummonQueen() {
+  if (!isSkillAvailable("summonQueen")) {
+    return;
+  }
+  queenReady = true;
+  finishPlayerAction({
+    type: "summon",
+    player: 1,
+    damage: 0,
+    skillId: "summonQueen",
+  }, { endTurn: false });
+  updateStatus("黑皇后已就绪，请落子。");
+}
+
+function handleQueenMove(cell) {
+  if (!selectedQueen) {
+    return false;
+  }
+  const { row, col } = cell;
+  const startRow = selectedQueen.row;
+  const startCol = selectedQueen.col;
+  if (row === startRow && col === startCol) {
+    selectedQueen = null;
+    updateStatus("轮到玩家");
+    return true;
+  }
+  const dr = row - startRow;
+  const dc = col - startCol;
+  const absDr = Math.abs(dr);
+  const absDc = Math.abs(dc);
+  if (!(dr === 0 || dc === 0 || absDr === absDc)) {
+    updateStatus("黑皇后只能直线或斜线移动。");
+    return true;
+  }
+  const stepR = dr === 0 ? 0 : dr / absDr;
+  const stepC = dc === 0 ? 0 : dc / absDc;
+  let r = startRow + stepR;
+  let c = startCol + stepC;
+  while (r !== row || c !== col) {
+    if (board[r][c] !== 0) {
+      updateStatus("路径上有棋子阻挡。");
+      return true;
+    }
+    r += stepR;
+    c += stepC;
+  }
+  if (board[row][col] === 1 || board[row][col] === queenValue) {
+    updateStatus("不能移动到己方棋子上。");
+    return true;
+  }
+  const capturedValue = board[row][col];
+  board[startRow][startCol] = 0;
+  board[row][col] = queenValue;
+  selectedQueen = null;
+  const { damage, removedCells } = applyLineDamageFromMove(row, col, 1);
+  applyDamageToOpponent(1, damage);
+  finishPlayerAction({
+    type: "move",
+    player: 1,
+    fromRow: startRow,
+    fromCol: startCol,
+    toRow: row,
+    toCol: col,
+    movedValue: queenValue,
+    capturedValue,
+    damage,
+    removedCells,
+  });
+  return true;
+}
+
 function handleSkillButtonClick(event) {
   const skillId = event.currentTarget.dataset.skill;
   if (skillId === "timeRewind") {
     useTimeRewind();
+    return;
+  }
+  if (skillId === "starDevour") {
+    handleStarDevour();
+    return;
+  }
+  if (skillId === "colorFlip") {
+    handleColorFlip();
+    return;
+  }
+  if (skillId === "summonQueen") {
+    handleSummonQueen();
     return;
   }
   if (!isSkillAvailable(skillId)) {
@@ -660,11 +889,19 @@ function handleSkillButtonClick(event) {
   if (currentSkill === skillId) {
     currentSkill = null;
     selectedSkillStone = null;
+    selectedQueen = null;
     updateStatus("轮到玩家");
   } else {
     currentSkill = skillId;
     selectedSkillStone = null;
-    updateStatus(skillId === "sandShift" ? "选择要移动的己方棋子。" : "选择要提走的 AI 棋子。");
+    selectedQueen = null;
+    if (skillId === "sandShift") {
+      updateStatus("选择要移动的己方棋子。");
+    } else if (skillId === "mountainLift") {
+      updateStatus("选择要提走的 AI 棋子。");
+    } else if (skillId === "boardBlast") {
+      updateStatus("选择爆破中心格。");
+    }
   }
   updateSkillUI();
 }
@@ -683,6 +920,18 @@ function handleCanvasClick(event) {
   }
   if (currentSkill === "mountainLift") {
     handleMountainLift(cell);
+    return;
+  }
+  if (currentSkill === "boardBlast") {
+    handleBoardBlast(cell);
+    return;
+  }
+  if (selectedQueen && handleQueenMove(cell)) {
+    return;
+  }
+  if (board[cell.row][cell.col] === queenValue) {
+    selectedQueen = { row: cell.row, col: cell.col };
+    updateStatus("选择黑皇后要移动的位置。");
     return;
   }
   handlePlayerMove(cell);
