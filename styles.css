@@ -59,6 +59,32 @@ header h1 {
   align-items: center;
   font-weight: 600;
   color: #4b3f2f;
+  flex-wrap: wrap;
+}
+
+.hp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hp-bar {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.hp-pip {
+  width: 16px;
+  height: 10px;
+  border-radius: 3px;
+  background: #e2c9c1;
+  border: 1px solid #c8a9a1;
+}
+
+.hp-pip.active {
+  background: #d8514a;
+  border-color: #b33b35;
 }
 
 .board-wrapper {

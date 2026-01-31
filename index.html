@@ -22,8 +22,14 @@
       <button id="restart">重新开始</button>
       <div id="status" class="status">玩家先手</div>
       <div class="hp">
-        <div>玩家 HP：<span id="player-hp"></span></div>
-        <div>AI HP：<span id="ai-hp"></span></div>
+        <div class="hp-row">
+          <span>玩家 HP：<span id="player-hp"></span></span>
+          <div id="player-hp-bar" class="hp-bar" aria-hidden="true"></div>
+        </div>
+        <div class="hp-row">
+          <span>AI HP：<span id="ai-hp"></span></span>
+          <div id="ai-hp-bar" class="hp-bar" aria-hidden="true"></div>
+        </div>
       </div>
     </section>
     <section class="board-wrapper">

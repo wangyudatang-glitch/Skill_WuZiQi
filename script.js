@@ -17,10 +17,23 @@ queenImage.onload = () => {
   drawBoard();
 };
 
+const aiHpStages = [1, 2, 3, 5, 8, 10];
+const skillUnlockOrder = [
+  "timeRewind",
+  "sandShift",
+  "mountainLift",
+  "boardBlast",
+  "starDevour",
+  "colorFlip",
+  "summonQueen",
+];
+
 let board = [];
 let isPlayerTurn = true;
 let gameOver = false;
 const maxHp = 3;
+let playerMaxHp = maxHp;
+let aiMaxHp = maxHp;
 let playerHp = maxHp;
 let aiHp = maxHp;
 let moveHistory = [];
@@ -30,6 +43,7 @@ let selectedSkillStone = null;
 let aiTimeoutId = null;
 let queenReady = false;
 let selectedQueen = null;
+let currentStage = 0;
 
 const skills = {
   timeRewind: { maxUses: 3, usesLeft: 3, cooldown: 0, lastUsedTurn: null },
@@ -49,26 +63,14 @@ const directions = [
 ];
 
 function initBoard() {
-  board = Array.from({ length: boardSize }, () => Array(boardSize).fill(0));
-  isPlayerTurn = true;
   gameOver = false;
-  playerHp = maxHp;
-  aiHp = maxHp;
-  moveHistory = [];
-  turnCount = 0;
-  currentSkill = null;
-  selectedSkillStone = null;
-  queenReady = false;
-  selectedQueen = null;
   if (aiTimeoutId) {
     window.clearTimeout(aiTimeoutId);
     aiTimeoutId = null;
   }
   resetSkills();
-  updateStatus("玩家先手");
-  updateHpDisplay();
-  updateSkillUI();
-  drawBoard();
+  currentStage = 0;
+  startStage();
 }
 
 function updateStatus(text) {
@@ -76,8 +78,10 @@ function updateStatus(text) {
 }
 
 function updateHpDisplay() {
-  playerHpEl.textContent = `${playerHp}/${maxHp}`;
-  aiHpEl.textContent = `${aiHp}/${maxHp}`;
+  playerHpEl.textContent = `${playerHp}/${playerMaxHp}`;
+  aiHpEl.textContent = `${aiHp}/${aiMaxHp}`;
+  renderHpBar("player-hp-bar", playerHp, playerMaxHp);
+  renderHpBar("ai-hp-bar", aiHp, aiMaxHp);
 }
 
 function resetSkills() {
@@ -85,6 +89,18 @@ function resetSkills() {
     skills[key].usesLeft = skills[key].maxUses;
     skills[key].lastUsedTurn = null;
   });
+}
+
+function getUnlockedSkillCount() {
+  return Math.min(skillUnlockOrder.length, 2 + currentStage);
+}
+
+function isSkillUnlocked(skillId) {
+  const index = skillUnlockOrder.indexOf(skillId);
+  if (index === -1) {
+    return false;
+  }
+  return index < getUnlockedSkillCount();
 }
 
 function getCooldownRemaining(skill) {
@@ -97,6 +113,9 @@ function getCooldownRemaining(skill) {
 function isSkillAvailable(skillId) {
   const skill = skills[skillId];
   if (!skill) {
+    return false;
+  }
+  if (!isSkillUnlocked(skillId)) {
     return false;
   }
   if (gameOver && skillId !== "timeRewind") {
@@ -131,6 +150,77 @@ function updateSkillUI() {
     }
     button.disabled = !isSkillAvailable(skillId);
     button.classList.toggle("active", currentSkill === skillId);
+    button.classList.toggle("locked", !isSkillUnlocked(skillId));
+  });
+}
+
+function resetSkills() {
+  Object.keys(skills).forEach((key) => {
+    skills[key].usesLeft = skills[key].maxUses;
+    skills[key].lastUsedTurn = null;
+  });
+}
+
+function getUnlockedSkillCount() {
+  return Math.min(skillUnlockOrder.length, 2 + currentStage);
+}
+
+function isSkillUnlocked(skillId) {
+  const index = skillUnlockOrder.indexOf(skillId);
+  if (index === -1) {
+    return false;
+  }
+  return index < getUnlockedSkillCount();
+}
+
+function getCooldownRemaining(skill) {
+  if (skill.cooldown === 0 || skill.lastUsedTurn === null) {
+    return 0;
+  }
+  return Math.max(0, skill.cooldown - (turnCount - skill.lastUsedTurn));
+}
+
+function isSkillAvailable(skillId) {
+  const skill = skills[skillId];
+  if (!skill) {
+    return false;
+  }
+  if (!isSkillUnlocked(skillId)) {
+    return false;
+  }
+  if (gameOver && skillId !== "timeRewind") {
+    return false;
+  }
+  if (!isPlayerTurn && skillId !== "timeRewind") {
+    return false;
+  }
+  if (skillId === "timeRewind" && moveHistory.length < 2) {
+    return false;
+  }
+  if (skillId === "summonQueen" && queenReady) {
+    return false;
+  }
+  return skill.usesLeft > 0 && getCooldownRemaining(skill) === 0;
+}
+
+function updateSkillUI() {
+  skillButtons.forEach((button) => {
+    const skillId = button.dataset.skill;
+    const skill = skills[skillId];
+    if (!skill) {
+      return;
+    }
+    const usesEl = button.querySelector("[data-skill-uses]");
+    const cdEl = button.querySelector("[data-skill-cd]");
+    if (usesEl) {
+      usesEl.textContent = Number.isFinite(skill.usesLeft) ? skill.usesLeft : "∞";
+    }
+    if (cdEl) {
+      cdEl.textContent = getCooldownRemaining(skill);
+    }
+    button.disabled = !isSkillAvailable(skillId);
+    button.classList.toggle("active", currentSkill === skillId);
+    button.classList.toggle("locked", !isSkillUnlocked(skillId));
   });
 }
 
@@ -189,6 +279,52 @@ function drawStone(row, col, player) {
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fill();
+}
+
+function startStage() {
+  board = Array.from({ length: boardSize }, () => Array(boardSize).fill(0));
+  isPlayerTurn = true;
+  moveHistory = [];
+  turnCount = 0;
+  currentSkill = null;
+  selectedSkillStone = null;
+  queenReady = false;
+  selectedQueen = null;
+  playerMaxHp = maxHp;
+  playerHp = playerMaxHp;
+  aiMaxHp = aiHpStages[currentStage];
+  aiHp = aiMaxHp;
+  updateStatus(`第 ${currentStage + 1} 关：玩家先手`);
+  updateHpDisplay();
+  updateSkillUI();
+  drawBoard();
+}
+
+function renderHpBar(containerId, current, total) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    return;
+  }
+  container.innerHTML = "";
+  for (let i = 0; i < total; i++) {
+    const pip = document.createElement("span");
+    pip.className = "hp-pip";
+    if (i < current) {
+      pip.classList.add("active");
+    }
+    container.appendChild(pip);
+  }
+}
+
+function advanceStage() {
+  if (currentStage >= aiHpStages.length - 1) {
+    gameOver = true;
+    updateStatus("通关成功！");
+    updateSkillUI();
+    return;
+  }
+  currentStage += 1;
+  startStage();
 }
 
 function getCellFromEvent(event) {
@@ -551,9 +687,7 @@ function finishPlayerAction(entry, { endTurn = true } = {}) {
   updateSkillUI();
   drawBoard();
   if (aiHp <= 0) {
-    gameOver = true;
-    updateStatus("玩家获胜！");
-    updateSkillUI();
+    advanceStage();
     return;
   }
   if (!endTurn) {
