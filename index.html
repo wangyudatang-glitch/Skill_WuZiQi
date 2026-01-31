@@ -10,7 +10,7 @@
   <main class="app">
     <header>
       <h1>技能五子棋</h1>
-      <p>连成五子可对对手造成 1 点伤害，并移除这条线上的棋子。</p>
+      <p>连成五子可对对手造成 1 点伤害，并移除这条线上的棋子；玩家每关 3 点血量。</p>
     </header>
     <section class="controls">
       <label for="difficulty">AI 难度</label>
@@ -45,7 +45,7 @@
           <span class="skill-info">
             <span class="skill-name">时光倒流</span>
             <span class="skill-desc">悔棋，撤回双方最新一手。</span>
-            <span class="skill-meta">剩余：<span data-skill-uses>3</span> 次</span>
+            <span class="skill-meta">Lv.<span data-skill-level>1</span> · 剩余：<span data-skill-uses>3</span> 次</span>
           </span>
         </button>
         <button class="skill-card" data-skill="sandShift" type="button">
@@ -55,7 +55,7 @@
           <span class="skill-info">
             <span class="skill-name">飞沙走石</span>
             <span class="skill-desc">向四周移动己方棋子一格。</span>
-            <span class="skill-meta">冷却：<span data-skill-cd>0</span>/10 手 · 剩余：<span data-skill-uses>5</span> 次</span>
+            <span class="skill-meta">Lv.<span data-skill-level>1</span> · 冷却：<span data-skill-cd>0</span>/<span data-skill-cd-max>10</span> 手 · 剩余：<span data-skill-uses>5</span> 次</span>
           </span>
         </button>
         <button class="skill-card" data-skill="mountainLift" type="button">
@@ -65,7 +65,7 @@
           <span class="skill-info">
             <span class="skill-name">力拔山兮</span>
             <span class="skill-desc">直接提走一个 AI 棋子。</span>
-            <span class="skill-meta">冷却：<span data-skill-cd>0</span>/25 手 · 剩余：<span data-skill-uses>2</span> 次</span>
+            <span class="skill-meta">Lv.<span data-skill-level>1</span> · 冷却：<span data-skill-cd>0</span>/<span data-skill-cd-max>25</span> 手 · 剩余：<span data-skill-uses>2</span> 次</span>
           </span>
         </button>
         <button class="skill-card" data-skill="boardBlast" type="button">
@@ -75,7 +75,7 @@
           <span class="skill-info">
             <span class="skill-name">棋盘爆破</span>
             <span class="skill-desc">消灭选定 3×3 范围内所有棋子。</span>
-            <span class="skill-meta">冷却：<span data-skill-cd>0</span>/50 手 · 剩余：<span data-skill-uses>2</span> 次</span>
+            <span class="skill-meta">Lv.<span data-skill-level>1</span> · 冷却：<span data-skill-cd>0</span>/<span data-skill-cd-max>50</span> 手 · 剩余：<span data-skill-uses>2</span> 次</span>
           </span>
         </button>
         <button class="skill-card" data-skill="starDevour" type="button">
@@ -85,7 +85,7 @@
           <span class="skill-info">
             <span class="skill-name">吞噬星空</span>
             <span class="skill-desc">消灭场上所有棋子。</span>
-            <span class="skill-meta">冷却：<span data-skill-cd>0</span>/500 手 · 剩余：<span data-skill-uses>∞</span></span>
+            <span class="skill-meta">Lv.<span data-skill-level>1</span> · 冷却：<span data-skill-cd>0</span>/<span data-skill-cd-max>500</span> 手 · 剩余：<span data-skill-uses>∞</span></span>
           </span>
         </button>
         <button class="skill-card" data-skill="colorFlip" type="button">
@@ -95,7 +95,7 @@
           <span class="skill-info">
             <span class="skill-name">两极反转</span>
             <span class="skill-desc">黑子变白子，白子变黑子。</span>
-            <span class="skill-meta">剩余：<span data-skill-uses>1</span> 次</span>
+            <span class="skill-meta">Lv.<span data-skill-level>1</span> · 剩余：<span data-skill-uses>1</span> 次</span>
           </span>
         </button>
         <button class="skill-card" data-skill="summonQueen" type="button">
@@ -105,11 +105,41 @@
           <span class="skill-info">
             <span class="skill-name">召唤外援</span>
             <span class="skill-desc">下一次落子变为黑皇后，可移动吃子。</span>
-            <span class="skill-meta">剩余：<span data-skill-uses>1</span> 次</span>
+            <span class="skill-meta">Lv.<span data-skill-level>1</span> · 剩余：<span data-skill-uses>1</span> 次</span>
+          </span>
+        </button>
+        <button class="skill-card" data-skill="randomDrop" type="button">
+          <span class="skill-icon" aria-hidden="true">
+            <img src="icon/skill8.jpg" alt="" />
+          </span>
+          <span class="skill-info">
+            <span class="skill-name">随机落子</span>
+            <span class="skill-desc">随机在空位落下一枚黑子。</span>
+            <span class="skill-meta">Lv.<span data-skill-level>1</span> · 冷却：<span data-skill-cd>0</span>/<span data-skill-cd-max>5</span> 手 · 剩余：<span data-skill-uses>5</span> 次</span>
+          </span>
+        </button>
+        <button class="skill-card" data-skill="deathDuel" type="button">
+          <span class="skill-icon" aria-hidden="true">
+            <img src="icon/skill9.jpg" alt="" />
+          </span>
+          <span class="skill-info">
+            <span class="skill-name">死亡决斗</span>
+            <span class="skill-desc">清空棋盘并将双方 HP 变为 1，禁用技能。</span>
+            <span class="skill-meta">Lv.<span data-skill-level>1</span> · 剩余：<span data-skill-uses>1</span> 次</span>
           </span>
         </button>
       </div>
     </section>
+    <div id="reward-modal" class="reward-modal" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="reward-card">
+        <h3>关卡奖励</h3>
+        <p>请选择一个奖励</p>
+        <div class="reward-actions">
+          <button id="reward-upgrade" type="button">升级随机旧技能</button>
+          <button id="reward-unlock" type="button">随机获得新技能</button>
+        </div>
+      </div>
+    </div>
     <section class="legend">
       <div><span class="stone player"></span> 玩家</div>
       <div><span class="stone ai"></span> AI</div>

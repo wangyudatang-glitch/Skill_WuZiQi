@@ -18,7 +18,7 @@ queenImage.onload = () => {
 };
 
 const aiHpStages = [1, 2, 3, 5, 8, 10];
-const skillUnlockOrder = [
+const skillIds = [
   "timeRewind",
   "sandShift",
   "mountainLift",
@@ -26,6 +26,8 @@ const skillUnlockOrder = [
   "starDevour",
   "colorFlip",
   "summonQueen",
+  "randomDrop",
+  "deathDuel",
 ];
 
 let board = [];
@@ -44,16 +46,22 @@ let aiTimeoutId = null;
 let queenReady = false;
 let selectedQueen = null;
 let currentStage = 0;
+let skillsDisabled = false;
+let awaitingReward = false;
 
-const skills = {
-  timeRewind: { maxUses: 3, usesLeft: 3, cooldown: 0, lastUsedTurn: null },
-  sandShift: { maxUses: 5, usesLeft: 5, cooldown: 10, lastUsedTurn: null },
-  mountainLift: { maxUses: 2, usesLeft: 2, cooldown: 25, lastUsedTurn: null },
-  boardBlast: { maxUses: 2, usesLeft: 2, cooldown: 50, lastUsedTurn: null },
-  starDevour: { maxUses: Infinity, usesLeft: Infinity, cooldown: 500, lastUsedTurn: null },
-  colorFlip: { maxUses: 1, usesLeft: 1, cooldown: 0, lastUsedTurn: null },
-  summonQueen: { maxUses: 1, usesLeft: 1, cooldown: 0, lastUsedTurn: null },
+const baseSkills = {
+  timeRewind: { maxUses: 3, cooldown: 0 },
+  sandShift: { maxUses: 5, cooldown: 10 },
+  mountainLift: { maxUses: 2, cooldown: 25 },
+  boardBlast: { maxUses: 2, cooldown: 50 },
+  starDevour: { maxUses: Infinity, cooldown: 500 },
+  colorFlip: { maxUses: 1, cooldown: 0 },
+  summonQueen: { maxUses: 1, cooldown: 0 },
+  randomDrop: { maxUses: 5, cooldown: 5 },
+  deathDuel: { maxUses: 1, cooldown: 0 },
 };
+
+const skills = {};
 
 const directions = [
   [1, 0],
@@ -68,7 +76,7 @@ function initBoard() {
     window.clearTimeout(aiTimeoutId);
     aiTimeoutId = null;
   }
-  resetSkills();
+  initializeSkills();
   currentStage = 0;
   startStage();
 }
@@ -84,23 +92,26 @@ function updateHpDisplay() {
   renderHpBar("ai-hp-bar", aiHp, aiMaxHp);
 }
 
-function resetSkills() {
+function initializeSkills() {
+  skillIds.forEach((skillId) => {
+    const baseSkill = baseSkills[skillId];
+    skills[skillId] = {
+      maxUses: baseSkill.maxUses,
+      usesLeft: baseSkill.maxUses,
+      cooldown: baseSkill.cooldown,
+      lastUsedTurn: null,
+      level: 1,
+      unlocked: false,
+    };
+  });
+  skills.timeRewind.unlocked = true;
+}
+
+function resetStageSkills() {
   Object.keys(skills).forEach((key) => {
     skills[key].usesLeft = skills[key].maxUses;
     skills[key].lastUsedTurn = null;
   });
-}
-
-function getUnlockedSkillCount() {
-  return Math.min(skillUnlockOrder.length, 2 + currentStage);
-}
-
-function isSkillUnlocked(skillId) {
-  const index = skillUnlockOrder.indexOf(skillId);
-  if (index === -1) {
-    return false;
-  }
-  return index < getUnlockedSkillCount();
 }
 
 function getCooldownRemaining(skill) {
@@ -115,7 +126,10 @@ function isSkillAvailable(skillId) {
   if (!skill) {
     return false;
   }
-  if (!isSkillUnlocked(skillId)) {
+  if (!skill.unlocked) {
+    return false;
+  }
+  if (skillsDisabled) {
     return false;
   }
   if (gameOver && skillId !== "timeRewind") {
@@ -142,85 +156,24 @@ function updateSkillUI() {
     }
     const usesEl = button.querySelector("[data-skill-uses]");
     const cdEl = button.querySelector("[data-skill-cd]");
+    const cdMaxEl = button.querySelector("[data-skill-cd-max]");
     if (usesEl) {
       usesEl.textContent = Number.isFinite(skill.usesLeft) ? skill.usesLeft : "∞";
+    }
+    const levelEl = button.querySelector("[data-skill-level]");
+    if (levelEl) {
+      levelEl.textContent = skill.level;
     }
     if (cdEl) {
       cdEl.textContent = getCooldownRemaining(skill);
     }
-    button.disabled = !isSkillAvailable(skillId);
-    button.classList.toggle("active", currentSkill === skillId);
-    button.classList.toggle("locked", !isSkillUnlocked(skillId));
-  });
-}
-
-function resetSkills() {
-  Object.keys(skills).forEach((key) => {
-    skills[key].usesLeft = skills[key].maxUses;
-    skills[key].lastUsedTurn = null;
-  });
-}
-
-function getUnlockedSkillCount() {
-  return Math.min(skillUnlockOrder.length, 2 + currentStage);
-}
-
-function isSkillUnlocked(skillId) {
-  const index = skillUnlockOrder.indexOf(skillId);
-  if (index === -1) {
-    return false;
-  }
-  return index < getUnlockedSkillCount();
-}
-
-function getCooldownRemaining(skill) {
-  if (skill.cooldown === 0 || skill.lastUsedTurn === null) {
-    return 0;
-  }
-  return Math.max(0, skill.cooldown - (turnCount - skill.lastUsedTurn));
-}
-
-function isSkillAvailable(skillId) {
-  const skill = skills[skillId];
-  if (!skill) {
-    return false;
-  }
-  if (!isSkillUnlocked(skillId)) {
-    return false;
-  }
-  if (gameOver && skillId !== "timeRewind") {
-    return false;
-  }
-  if (!isPlayerTurn && skillId !== "timeRewind") {
-    return false;
-  }
-  if (skillId === "timeRewind" && moveHistory.length < 2) {
-    return false;
-  }
-  if (skillId === "summonQueen" && queenReady) {
-    return false;
-  }
-  return skill.usesLeft > 0 && getCooldownRemaining(skill) === 0;
-}
-
-function updateSkillUI() {
-  skillButtons.forEach((button) => {
-    const skillId = button.dataset.skill;
-    const skill = skills[skillId];
-    if (!skill) {
-      return;
-    }
-    const usesEl = button.querySelector("[data-skill-uses]");
-    const cdEl = button.querySelector("[data-skill-cd]");
-    if (usesEl) {
-      usesEl.textContent = Number.isFinite(skill.usesLeft) ? skill.usesLeft : "∞";
-    }
-    if (cdEl) {
-      cdEl.textContent = getCooldownRemaining(skill);
+    if (cdMaxEl) {
+      cdMaxEl.textContent = skill.cooldown;
     }
     button.disabled = !isSkillAvailable(skillId);
     button.classList.toggle("active", currentSkill === skillId);
-    button.classList.toggle("locked", !isSkillUnlocked(skillId));
+    button.classList.toggle("locked", !skill.unlocked);
+    button.style.display = skill.unlocked ? "flex" : "none";
   });
 }
 
@@ -290,10 +243,13 @@ function startStage() {
   selectedSkillStone = null;
   queenReady = false;
   selectedQueen = null;
+  skillsDisabled = false;
+  resetStageSkills();
   playerMaxHp = maxHp;
   playerHp = playerMaxHp;
   aiMaxHp = aiHpStages[currentStage];
   aiHp = aiMaxHp;
+  awaitingReward = false;
   updateStatus(`第 ${currentStage + 1} 关：玩家先手`);
   updateHpDisplay();
   updateSkillUI();
@@ -323,8 +279,69 @@ function advanceStage() {
     updateSkillUI();
     return;
   }
-  currentStage += 1;
-  startStage();
+  showRewardModal();
+}
+
+function showRewardModal() {
+  const modal = document.getElementById("reward-modal");
+  if (!modal) {
+    currentStage += 1;
+    startStage();
+    return;
+  }
+  awaitingReward = true;
+  isPlayerTurn = false;
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("show");
+}
+
+function closeRewardModal() {
+  const modal = document.getElementById("reward-modal");
+  if (modal) {
+    modal.classList.remove("show");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  awaitingReward = false;
+}
+
+function getRandomUnlockedSkill() {
+  const unlocked = skillIds.filter((id) => skills[id].unlocked);
+  if (unlocked.length === 0) {
+    return null;
+  }
+  return unlocked[Math.floor(Math.random() * unlocked.length)];
+}
+
+function getRandomLockedSkill() {
+  const locked = skillIds.filter((id) => !skills[id].unlocked);
+  if (locked.length === 0) {
+    return null;
+  }
+  return locked[Math.floor(Math.random() * locked.length)];
+}
+
+function upgradeSkill(skillId) {
+  const skill = skills[skillId];
+  if (!skill) {
+    return;
+  }
+  skill.level += 1;
+  skill.cooldown = Math.ceil(skill.cooldown / 2);
+  skill.lastUsedTurn = null;
+  if (Number.isFinite(skill.maxUses)) {
+    skill.maxUses *= 2;
+  }
+  skill.usesLeft = skill.maxUses;
+}
+
+function unlockSkill(skillId) {
+  const skill = skills[skillId];
+  if (!skill) {
+    return;
+  }
+  skill.unlocked = true;
+  skill.usesLeft = skill.maxUses;
+  skill.lastUsedTurn = null;
 }
 
 function getCellFromEvent(event) {
@@ -764,6 +781,18 @@ function undoMove(entry) {
   }
   if (entry.type === "summon") {
     queenReady = false;
+    return;
+  }
+  if (entry.type === "deathDuel") {
+    entry.removedCells.forEach((cell) => {
+      board[cell.row][cell.col] = cell.value;
+    });
+    playerMaxHp = entry.prevPlayerMaxHp;
+    aiMaxHp = entry.prevAiMaxHp;
+    playerHp = entry.prevPlayerHp;
+    aiHp = entry.prevAiHp;
+    skillsDisabled = entry.prevSkillsDisabled;
+    updateHpDisplay();
   }
 }
 
@@ -942,6 +971,71 @@ function handleSummonQueen() {
   updateStatus("黑皇后已就绪，请落子。");
 }
 
+function handleRandomDrop() {
+  if (!isSkillAvailable("randomDrop")) {
+    return;
+  }
+  const empties = [];
+  for (let row = 0; row < boardSize; row++) {
+    for (let col = 0; col < boardSize; col++) {
+      if (board[row][col] === 0) {
+        empties.push({ row, col });
+      }
+    }
+  }
+  if (empties.length === 0) {
+    updateStatus("棋盘已满，无法随机落子。");
+    return;
+  }
+  const choice = empties[Math.floor(Math.random() * empties.length)];
+  board[choice.row][choice.col] = 1;
+  const { damage, removedCells } = applyLineDamageFromMove(choice.row, choice.col, 1);
+  applyDamageToOpponent(1, damage);
+  finishPlayerAction({
+    type: "place",
+    player: 1,
+    row: choice.row,
+    col: choice.col,
+    damage,
+    removedCells,
+    skillId: "randomDrop",
+  }, { endTurn: false });
+}
+
+function handleDeathDuel() {
+  if (!isSkillAvailable("deathDuel")) {
+    return;
+  }
+  const removedCells = [];
+  for (let row = 0; row < boardSize; row++) {
+    for (let col = 0; col < boardSize; col++) {
+      if (board[row][col] !== 0) {
+        removedCells.push({ row, col, value: board[row][col] });
+        board[row][col] = 0;
+      }
+    }
+  }
+  playerMaxHp = 1;
+  aiMaxHp = 1;
+  playerHp = 1;
+  aiHp = 1;
+  skillsDisabled = true;
+  updateHpDisplay();
+  finishPlayerAction({
+    type: "deathDuel",
+    player: 1,
+    removedCells,
+    prevPlayerHp,
+    prevAiHp,
+    prevPlayerMaxHp,
+    prevAiMaxHp,
+    prevSkillsDisabled,
+    damage: 0,
+    skillId: "deathDuel",
+  }, { endTurn: false });
+  updateStatus("死亡决斗开始，技能已禁用。");
+}
+
 function handleQueenMove(cell) {
   if (!selectedQueen) {
     return false;
@@ -1001,6 +1095,9 @@ function handleQueenMove(cell) {
 
 function handleSkillButtonClick(event) {
   const skillId = event.currentTarget.dataset.skill;
+  if (awaitingReward) {
+    return;
+  }
   if (skillId === "timeRewind") {
     useTimeRewind();
     return;
@@ -1015,6 +1112,14 @@ function handleSkillButtonClick(event) {
   }
   if (skillId === "summonQueen") {
     handleSummonQueen();
+    return;
+  }
+  if (skillId === "randomDrop") {
+    handleRandomDrop();
+    return;
+  }
+  if (skillId === "deathDuel") {
+    handleDeathDuel();
     return;
   }
   if (!isSkillAvailable(skillId)) {
@@ -1041,7 +1146,7 @@ function handleSkillButtonClick(event) {
 }
 
 function handleCanvasClick(event) {
-  if (gameOver || !isPlayerTurn) {
+  if (gameOver || !isPlayerTurn || awaitingReward) {
     return;
   }
   const cell = getCellFromEvent(event);
@@ -1076,5 +1181,32 @@ canvas.addEventListener("click", handleCanvasClick);
 skillButtons.forEach((button) => {
   button.addEventListener("click", handleSkillButtonClick);
 });
+const upgradeBtn = document.getElementById("reward-upgrade");
+const unlockBtn = document.getElementById("reward-unlock");
+if (upgradeBtn && unlockBtn) {
+  upgradeBtn.addEventListener("click", () => {
+    const target = getRandomUnlockedSkill();
+    if (target) {
+      upgradeSkill(target);
+    }
+    closeRewardModal();
+    currentStage += 1;
+    startStage();
+  });
+  unlockBtn.addEventListener("click", () => {
+    const target = getRandomLockedSkill();
+    if (target) {
+      unlockSkill(target);
+    } else {
+      const fallback = getRandomUnlockedSkill();
+      if (fallback) {
+        upgradeSkill(fallback);
+      }
+    }
+    closeRewardModal();
+    currentStage += 1;
+    startStage();
+  });
+}
 
 initBoard();
