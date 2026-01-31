@@ -1,0 +1,89 @@
+:root {
+  color-scheme: light;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f4f1ea;
+  color: #2d2a26;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+header h1 {
+  margin-bottom: 8px;
+  font-size: 32px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.controls select,
+.controls button {
+  padding: 8px 12px;
+  font-size: 16px;
+  border-radius: 6px;
+  border: 1px solid #b9b1a6;
+  background: white;
+}
+
+.controls button {
+  cursor: pointer;
+  background: #4b3f2f;
+  color: white;
+  border: none;
+}
+
+.status {
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #ede6d9;
+}
+
+.board-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+canvas {
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(145deg, #d6b47c, #cda566);
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.stone {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  margin-right: 6px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.stone.player {
+  background: radial-gradient(circle at 30% 30%, #555, #111);
+}
+
+.stone.ai {
+  background: radial-gradient(circle at 30% 30%, #fff, #d7d1c5);
+  border: 1px solid #b9b1a6;
+}
